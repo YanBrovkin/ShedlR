@@ -1,0 +1,291 @@
+﻿@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script src="~/Scripts/knockout-3.2.0.debug.js"></script>
+<script src="~/Scripts/knockout.mapping-latest.debug.js"></script>
+
+@section featured {
+    <div class="jumbotron">
+        <div class="container">
+            <div class="panel panel-default">
+                <div class="panel-body">
+                    Задачи, выполненные исполнителями
+                </div>
+            </div>
+        </div>
+    </div>
+}
+<div class="panel panel-default">
+    <div class="panel-heading">Неодобренные задачи</div>
+    <div class="panel-body">
+        <table class="table table-hover" data-bind="triggerUpdate: rawData">
+            <thead>
+                <tr>
+                    @*<th>Исполнитель</th>*@
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Описание</th>
+                    <th>Время выполнения</th>
+                    <th>Признаю временные затраты</th>
+                </tr>
+            </thead>
+            <tbody data-bind="foreach: uniqueExecutors">
+                <tr>
+                    <th colspan="6" data-bind="text: $data"></th>
+                </tr>
+                <!-- ko foreach: groupedNotApprovedTasks.index.Executor()[$data] -->
+                <tr>
+                    <td>
+                        <span data-bind="text: Id"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: toDate(RegisteredAt)"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: Description"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: ExecutionTime"></span>
+                    </td>
+                    <td>
+                        <input type="button" value="Да" class="btn btn-success" data-bind="click: function () { TaskViewModel.approveTask($data); }" />
+
+                        <input type="button" value="Нет" class="btn btn-danger" />
+                    </td>
+                </tr>
+                <!-- /ko -->
+            </tbody>
+        </table>
+    </div>
+</div>
+<hr />
+<div class="panel panel-default">
+    <div class="panel-heading">Одобренные задачи</div>
+    <div class="panel-body">
+        <table class="table table-hover" data-bind="triggerUpdate: rawData">
+            <thead>
+                <tr>
+                    @*<th>Исполнитель</th>*@
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Описание</th>
+                    <th>Время выполнения</th>
+                    <th>Признаю временные затраты</th>
+                </tr>
+            </thead>
+            <tbody data-bind="foreach: uniqueExecutors">
+
+                <tr>
+                    <th colspan="6" data-bind="text: $data"></th>
+                </tr>
+                <!-- ko foreach: groupedApprovedTasks.index.Executor()[$data] -->
+                <tr>
+                    <td>
+                        <span data-bind="text: Id"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: toDate(RegisteredAt)"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: Description"></span>
+                    </td>
+                    <td>
+                        <span data-bind="text: ExecutionTime"></span>
+                    </td>
+                    <td>
+                        <input type="button" value="Отменить" class="btn btn-danger" data-bind="click: function () { TaskViewModel.disapproveTask($data); }" />
+                    </td>
+                </tr>
+                <!-- /ko -->
+            </tbody>
+        </table>
+    </div>
+</div>
+<script type="text/javascript">
+    $(document).ready(function () {
+        loadTasks();
+    });
+
+    ko.observableArray.fn.distinct = function (prop) {
+        var target = this;
+        target.index = {};
+        target.index[prop] = ko.observable({});
+
+        ko.computed(function () {
+            //rebuild index
+            var propIndex = {};
+
+            ko.utils.arrayForEach(target(), function (item) {
+                var key = ko.utils.unwrapObservable(item[prop]);
+                if (key) {
+                    propIndex[key] = propIndex[key] || [];
+                    propIndex[key].push(item);
+                }
+            });
+
+            target.index[prop](propIndex);
+        });
+
+        return target;
+    };
+
+
+    var self = this;
+
+    self.rawData = ko.observableArray([]);
+
+    self.uniqueExecutors = ko.observableArray([]);
+    self.groupedApprovedTasks = ko.observableArray([]);
+    self.groupedNotApprovedTasks = ko.observableArray([]);
+
+    // Функция преобразования даты JSON в нормальную дату
+    function toDate(value) {
+        var dateRegExp = /^\/Date\((.*?)\)\/$/;
+        var date = dateRegExp.exec(value);
+
+        var dt = new Date(parseInt(date[1]));
+
+        var dd = dt.getDate();
+        var mm = dt.getMonth() + 1; //January is 0!
+
+        var yyyy = dt.getFullYear();
+        if (dd < 10) {
+            dd = '0' + dd
+        }
+        if (mm < 10) {
+            mm = '0' + mm
+        }
+        var day = dd + '/' + mm + '/' + yyyy;
+
+        return day;
+    };
+
+    // функция загрузки списка задач через AJAX-call (POST)
+    function loadTasks() {
+        $.ajax({
+            type: "POST",
+            url: "@Url.Action("GetTasks", "Customer", new { area = "Customer" })",
+            success: function (data) {
+                //alert("Success");
+                //self.rawData(data);
+                //var dataFromServer = ko.utils.parseJson(data);
+                //var mappedData = ko.utils.arrayMap(data, function (item) {
+                //    return new task(item.Id, item.Customer, item.Executor, item.RegisteredAt, item.Description, item.ExecutionTime, item.Approved);
+                //});
+                //var mappedData = ko.mapping.fromJS(data);
+                self.rawData(data);
+
+                var ApprovedTasks = 
+                    ko.observableArray(ko.utils.arrayFilter(data, function (item) {
+                        return item.Approved == true;
+                    })).distinct('Executor');
+
+                var NotApprovedTasks = 
+                    ko.observableArray(ko.utils.arrayFilter(data, function (item) {
+                        return item.Approved == false;
+                    })).distinct('Executor');
+
+                var executors = ko.utils.arrayMap(data, function (item) {
+                    return item.Executor;
+                });
+
+                var justExecutors = ko.observableArray([]);
+
+                justExecutors(executors.sort());
+
+                var distinctExecutors = ko.utils.arrayGetDistinctValues(justExecutors()).sort();
+
+                self.groupedApprovedTasks = ApprovedTasks;
+                self.groupedNotApprovedTasks = NotApprovedTasks;
+
+                self.uniqueExecutors(distinctExecutors);
+            },
+            error: function (err) {
+                alert(err.status + " <--------------->");
+            }
+        });
+
+    };
+    // объект - задача
+    var task = function (Id, Customer, Executor, RegisteredAt, Description, ExecutionTime, Approved)
+    {
+        this.Id = ko.observable(Id);
+        this.Customer = ko.observable(Customer);
+        this.Executor = ko.observable(Executor);
+        this.RegisteredAt = ko.observable(RegisteredAt);
+        this.Description = ko.observable(Description);
+        this.ExecutionTime = ko.observable(ExecutionTime);
+        this.Approved = ko.observable(Approved);
+    };
+
+    //объект группировки задач
+    var taskGroup = function (Key, Tasks)
+    {
+        this.Key = ko.observable(Key);
+        this.Tasks = ko.observableArray([]);
+    };
+
+
+    //объект - контейнер, для инициализации темплейтов
+    var TaskViewModel = {
+        selectedDate: ko.observable()
+    };
+
+    TaskViewModel.searchTasks = function (formElements) {
+        loadTasks((formElements[0]).value);
+    };
+
+    //одобрение временных затрат
+    TaskViewModel.approveTask = function (d) {
+        //var self = this;
+
+        var Task = {};
+        Task = d;
+
+        $.ajax({
+            type: "POST",
+            url: "@Url.Action("ApproveTask", "Customer", new { area = "Customer" })?id=" + Task.Id,
+            success: function (data) {
+                //alert("Задача успешно одобрена " + Task.Id);
+
+                var updatedTask = data;
+
+                self.groupedNotApprovedTasks.remove(Task);
+                self.groupedApprovedTasks.push(updatedTask);
+            },
+            error: function (err) {
+                //alert("Возникла ошибка, пожалуйста перезагрузите страницу и попробуйте снова " + err.status);
+                TaskViewModel.reset();
+            }
+        });
+    };
+
+    //неодобрение временных затрат
+    TaskViewModel.disapproveTask = function (d) {
+
+        var Task = {};
+        Task = d;
+
+        $.ajax({
+            type: "POST",
+            url: "@Url.Action("DisApproveTask", "Customer", new { area = "Customer" })?id=" + Task.Id,
+            success: function (data) {
+                //alert("Затраты на задачу не одобрены " + data.status);
+                //self.Table.Tasks.remove(d)
+                var updatedTask = data;
+
+                self.groupedApprovedTasks.remove(Task);
+                self.groupedNotApprovedTasks.push(updatedTask);
+            },
+            error: function (err) {
+                alert("Возникла ошибка, пожалуйста перезагрузите страницу и попробуйте снова " + err.status);
+                TaskViewModel.reset();
+            }
+        });
+    };
+
+    ko.applyBindings(TaskViewModel);
+</script>
+

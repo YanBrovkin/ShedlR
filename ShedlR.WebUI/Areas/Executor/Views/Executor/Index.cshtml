@@ -1,0 +1,284 @@
+﻿@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<script src="~/Scripts/knockout-3.2.0.js"></script>
+
+@section featured {
+  <div class="jumbotron">
+    <div class="container-fluid">
+        <div class="row"><div class="col-md-12"></div></div>
+        <div class ="row">
+            <div class="col-md-2"><h4 class="text-right">Задачи за</h4></div>
+            <div class="col-md-10">
+        <form class="navbar-form form-search" role="search" id="searchForm" data-bind="submit: searchTasks">
+            <div class="form-group">
+                <div class='input-group date' id='datetimepicker'>
+                    <input type='text' name="selectedDate" id="selectedDate" class="form-control search-query" placeholder="??.??.???? ??:??" data-bind="value: selectedDate"/>
+                    <span class="input-group-addon"><span class="glyphicon glyphicon-calendar"></span>
+                    </span>
+                </div>
+            </div>
+            @*<input type="submit" id="LoadRecordsButton" class="btn btn-default" />*@
+            <button type="submit" class="btn btn-default">Найти</button>
+        </form>
+                </div>
+        </div>
+    </div>
+  </div>
+}
+
+<input type="button" value="Добавить задачу" class="btn btn-default" data-bind="click: function () { TaskViewModel.addnewRecord(); }" />
+<table class="table table-hover table-striped">
+    <thead>
+        <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Заказчик</th>
+            <th>Описание</th>
+            <th>Время выполнения</th>
+        </tr>
+    </thead>
+    <tbody data-bind="template: { name: currentTemplate, foreach: Tasks }"></tbody>
+</table>
+
+<script type="text/html" id="readonlyTemplate">
+    <tr>
+        <td>
+            <span data-bind="text: Id"></span>
+        </td>
+        <td>
+            <span data-bind="text: RegisteredAt"></span>
+        </td>
+        <td>
+            <span data-bind="text: Customer"></span>
+        </td>
+        <td hidden>
+            <span data-bind="text: Executor"></span>
+        </td>
+        <td>
+            <span data-bind="text: Description"></span>
+        </td>
+        <td>
+            <span data-bind="text: ExecutionTime"></span>
+        </td>
+        <td>
+            <input type="button" value="Edit" class="btn btn-default" data-bind="click: function () { TaskViewModel.editTemplate($data); }" />
+        </td>
+        <td>
+            <input type="button" value="delete" class="btn btn-default" data-bind="click: function () { TaskViewModel.deleteTask($data); }" />
+        </td>
+    </tr>
+</script>
+
+<script type="text/html" id="editTemplate">
+    <tr>
+        <td>
+            <input type="text" data-bind="value: $data.Id" id="txtid" disabled="disabled" />
+        </td>
+        <td>
+            <input type="text" data-bind="value: $data.RegisteredAt" id="txtregisteredat" />
+        </td>
+        <td>
+            <input type="text" data-bind="value: $data.Customer" id="txtcustomer" />
+        </td>
+        <td hidden>
+            <span data-bind="value: $data.Executor"></span>
+        </td>
+        <td>
+            <input type="text" data-bind="value: $data.Description" id="txtdescription" />
+        </td>
+        <td>
+            <input type="text" data-bind="value: $data.ExecutionTime" id="txtexecutiontime" />
+        </td>
+        <td>
+            <input type="button" class="btn btn-default" value="Save" data-bind="click: TaskViewModel.saveTask" />
+        </td>
+        <td>
+            <input type="button" class="btn btn-default" value="Cancel" data-bind="click: function () { TaskViewModel.reset(); }" />
+        </td>
+    </tr>
+</script>
+
+<script type="text/javascript">
+    // Функция преобразования даты JSON в нормальную дату
+    function toDate(value) {
+        var dateRegExp = /^\/Date\((.*?)\)\/$/;
+        var date = dateRegExp.exec(value);
+
+        var dt = new Date(parseInt(date[1]));
+
+        var dd = dt.getDate();
+        var mm = dt.getMonth() + 1; //January is 0!
+
+        var yyyy = dt.getFullYear();
+        if (dd < 10) {
+            dd = '0' + dd
+        }
+        if (mm < 10) {
+            mm = '0' + mm
+        }
+        var day = dd + '/' + mm + '/' + yyyy;
+
+        return day;
+    };
+
+    $(document).ready(function () {
+        //$('#datetimepicker').datetimepicker({
+        //    language: 'ru'
+        //});
+        $('#datetimepicker').datetimepicker();
+    });
+    var self = this;
+
+    //Переменная - индикатор типа операции: новая запись или редактирование
+    var IsNewRecord = false;
+
+    self.Tasks = ko.observableArray([]);
+
+
+    // функция загрузки списка задач через AJAX-call (POST)
+    function loadTasks(selectedDate) {
+        var d = new Date(selectedDate);
+        $.ajax({
+            type: "POST",
+            url: "@Url.Action("GetTasks", "Executor", new { area = "Executor" })?selectedDate=" + d.toLocaleDateString() + " "+d.toLocaleTimeString(),
+                success: function (data) {
+                    //alert("Success");
+                    var tasks = [];
+                    for (var i = 0; i < data.length; i++) {
+                        var task = data[i];
+
+                        task.RegisteredAt = toDate(task.RegisteredAt);
+
+                        tasks.push(task);
+                    }
+
+                    self.Tasks(tasks);
+                },
+                error: function (err) {
+                    alert(err.status + " <--------------->");
+                }
+            });
+
+    };
+
+        //Объект - задача
+        function Task(id, registeredat, customer, executor, description, executiontime, approved) {
+            return {
+                Id: ko.observable(id),
+                RegisteredAt: ko.observable(registeredat),
+                Customer: ko.observable(customer),
+                Executor: ko.observable(executor),
+                Description: ko.observable(description),
+                ExecutionTime: ko.observable(executiontime),
+                Approved: ko.observable(approved)
+            }
+        };
+        //объект - контейнер, для инициализации темплейтов
+        var TaskViewModel = {
+            readonlyTemplate: ko.observable("readonlyTemplate"),
+            editTemplate: ko.observable(),
+            selectedDate: ko.observable()
+        };
+
+        //метод выбора текущего темплейта
+        TaskViewModel.currentTemplate = function (tmpl) {
+            return tmpl === this.editTemplate() ? 'editTemplate' : this.readonlyTemplate();
+        }.bind(TaskViewModel);
+
+        TaskViewModel.searchTasks = function (formElements) {
+            loadTasks((formElements[0]).value);
+        };
+
+        TaskViewModel.addnewRecord = function () {
+            //alert("Add Called");
+            var currentDateTime = moment(new Date()).format("L");
+
+
+            self.Tasks.push(new Task(0, currentDateTime, "", "", "", 0, false));
+            IsNewRecord = true; //Флаг состояния - новая запись
+        };
+
+        //Метод сохранения объекта (как для нового объекта, так и для редактирования существующего)
+        TaskViewModel.saveTask = function (d) {
+
+            var Tsk = {};
+            Tsk.Id = d.Id;
+            Tsk.RegisteredAt = d.RegisteredAt;
+            Tsk.Customer = d.Customer;
+            Tsk.Executor = d.Executor;
+            Tsk.Description = d.Description;
+            Tsk.ExecutionTime = d.ExecutionTime;
+            Tsk.Approved = false;
+            //редактирование существующего объекта
+            if (IsNewRecord === false) {
+                $.ajax({
+                    type: "POST",
+                    url: "@Url.Action("Edit", "Executor", new { area = "Executor" })?id=" + Tsk.Id,
+                        data: Tsk,
+                        success: function (data) {
+                            alert("Задача успешно сохранена " + data.status);
+                            TaskViewModel.reset();
+                        },
+                        error: function (err) {
+                            alert("Возникла ошибка, пожалуйста перезагрузите страницу и попробуйте снова " + err.status);
+                            TaskViewModel.reset();
+                        }
+                    });
+                }
+                //создание нового объекта
+                if (IsNewRecord === true) {
+                    IsNewRecord = false;
+                    $.ajax({
+                        type: "POST",
+                        url: "@Url.Action("Create", "Executor", new { area = "Executor" })",
+                        data: Tsk,
+                        success: function (data) {
+                            alert("Задача успешно добавлена " + data.status);
+                            TaskViewModel.reset();
+                            loadTasks();
+                        },
+                        error: function (err) {
+                            alert("Возникла ошибка, пожалуйста перезагрузите страницу и попробуйте снова " + err.status);
+                            TaskViewModel.reset();
+                        }
+                    });
+                }
+            };
+
+            //удаление записи
+    TaskViewModel.deleteTask = function (d) {
+        //создание нового объекта
+        if (IsNewRecord === true) {
+            IsNewRecord = false;
+            TaskViewModel.reset();
+            loadTasks();
+        }
+        else {
+            $.ajax({
+                type: "POST",
+                url: "@Url.Action("Delete", "Executor", new { area = "Executor" })?id=" + d.Id,
+                success: function (data) {
+                    alert("Задача успешно удалена " + data.status);
+                    TaskViewModel.reset();
+                    loadTasks();
+                },
+                error: function (err) {
+                    alert("Возникла ошибка, пожалуйста перезагрузите страницу и попробуйте снова " + err.status);
+                    TaskViewModel.reset();
+                }
+            });
+        }
+    };
+
+
+
+            //Сброс темплейта
+            TaskViewModel.reset = function (t) {
+                this.editTemplate("readonlyTemplate");
+            };
+
+
+            ko.applyBindings(TaskViewModel);
+</script>
