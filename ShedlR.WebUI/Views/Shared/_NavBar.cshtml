@@ -1,0 +1,66 @@
+﻿@helper ActiveItem(string actionName, string controllerName, string areaName)
+{
+    if (ViewContext.RouteData.Values["action"].ToString() == actionName &&
+            ViewContext.RouteData.Values["controller"].ToString() == controllerName &&
+            (ViewContext.RouteData.DataTokens["area"] == null || ViewContext.RouteData.DataTokens["area"].ToString() == areaName))
+    {
+    @:active
+    }
+}
+
+<div class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">ShedlR</a>
+        </div>
+        <div class="navbar-collapse collapse">
+            @if (Request.IsAuthenticated)
+            {
+                <ul class="nav navbar-nav pull-left">
+                <li class="@ActiveItem("Index", "Home", null)">@Html.ActionLink("Home", "Index", "Home")</li>
+                <li class="@ActiveItem("About", "Home", null)">@Html.ActionLink("About", "About", "Home")</li>
+                <li class="@ActiveItem("Contact", "Home", null)">@Html.ActionLink("Contact", "Contact", "Home")</li>
+                
+                @if (Roles.IsUserInRole("Executor"))
+                {
+                    <li class="@ActiveItem("Index", "Executor", "Executor")">@Html.ActionLink("Исполнитель", "Index", "Executor", new { area = "Executor" }, null)</li>
+                }
+                @if (Roles.IsUserInRole("Customer"))
+                { 
+                    <li class="@ActiveItem("Index", "Customer", "Customer")">@Html.ActionLink("Заказчик", "Index", "Customer", new { area = "Customer" }, null)</li>
+                }
+                </ul>
+                using (Html.BeginForm("LogOff", "Account", new { area = "" }, FormMethod.Post, new { id = "logoutForm", @class = "navbar-form pull-right" }))
+                {
+                    <button type="submit" class="btn">Log Off</button>
+                    @Html.AntiForgeryToken()
+                }
+                <ul class="nav pull-right">
+                    <li>
+                        <div class="nav navbar-text">
+                            Hi, @Html.ActionLink(User.Identity.Name, "Manage", "Account")
+                        </div>
+                    </li>
+                    <li class="divider-vertical"></li>
+                </ul>
+            }
+            else
+            {
+                <ul class="nav navbar-nav pull-left">
+                    <li class="@ActiveItem("Index", "Home", null)">@Html.ActionLink("Home", "Index", "Home")</li>
+                    <li class="@ActiveItem("About", "Home", null)">@Html.ActionLink("About", "About", "Home")</li>
+                    <li class="@ActiveItem("Contact", "Home", null)">@Html.ActionLink("Contact", "Contact", "Home")</li>
+                    <li class="@ActiveItem("Index", "Executor", "Executor")">@Html.ActionLink("Исполнитель", "Index", "Executor", new { area = "Executor" }, null)</li>
+                    <li class="@ActiveItem("Index", "Customer", "Customer")">@Html.ActionLink("Заказчик", "Index", "Customer", new { area = "Customer" }, null)</li>
+                </ul>
+                
+                @Html.Action("ExternalLoginsList", "Account", new { area="", ReturnUrl = ViewBag.ReturnUrl })
+            }
+        </div>
+    </div>
+</div>
